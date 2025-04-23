@@ -1,79 +1,68 @@
-const socket = io();
-const editor = document.getElementById('editor');
+document.addEventListener('DOMContentLoaded', () => {
+  // 1) Yjs setup
+  const ydoc = new Y.Doc();
+  const wsUrl =
+    (window.location.protocol === 'https:' ? 'wss://' : 'ws://') +
+    window.location.host;
+  // “collab-editor-room” is the shared room name
+  const provider = new Y.WebsocketProvider(wsUrl, 'collab-editor-room', ydoc);
+  const ytext = ydoc.getText('editor');
 
-let lastValue = '';
-let isApplyingRemote = false;
+  // 2) Editor binding
+  const editor = document.getElementById('editor');
 
-// Auto-resize the textarea to fit content
-function autoResize() {
-  editor.style.height = 'auto';
-  editor.style.height = editor.scrollHeight + 'px';
-}
+  // When remote updates arrive, update the DIV (preserving cursor roughly)
+  ytext.observe(() => {
+    const sel = window.getSelection();
+    const range = sel.rangeCount ? sel.getRangeAt(0) : null;
 
-// Initialize with server content
-socket.on('init', content => {
-  lastValue = content;
-  editor.value = content;
-  autoResize();
-});
+    editor.innerHTML = ytext.toString();
 
-// Compute diff between lastValue and current, emit single op
-editor.addEventListener('input', () => {
-  if (isApplyingRemote) return;
+    if (range) {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  });
 
-  autoResize();
-  const newValue = editor.value;
-  const oldValue = lastValue;
+  // On local edits, push the full HTML into Y.Text
+  editor.addEventListener('input', () => {
+    ytext.delete(0, ytext.length);
+    ytext.insert(0, editor.innerHTML);
+  });
 
-  // 1) Find start of diff
-  let start = 0;
-  while (
-    start < oldValue.length &&
-    start < newValue.length &&
-    oldValue[start] === newValue[start]
-  ) {
-    start++;
-  }
+  // 3) Image-menu logic
+  const addImageBtn = document.getElementById('addImage');
+  const imageMenu = document.getElementById('imageMenu');
+  const importFileBtn = document.getElementById('importFile');
+  const importUrlBtn = document.getElementById('importUrl');
+  const fileInput = document.getElementById('fileInput');
 
-  // 2) Find common tail length
-  let oldEnd = oldValue.length - 1;
-  let newEnd = newValue.length - 1;
-  let tail = 0;
-  while (
-    oldEnd >= start &&
-    newEnd >= start &&
-    oldValue[oldEnd] === newValue[newEnd]
-  ) {
-    oldEnd--;
-    newEnd--;
-    tail++;
-  }
+  addImageBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    imageMenu.classList.toggle('show');
+  });
+  document.addEventListener('click', () => {
+    imageMenu.classList.remove('show');
+  });
 
-  // 3) Compute removed/inserted
-  const removed = oldValue.length - start - tail;
-  const inserted = newValue.length - start - tail;
-  const insertedText = newValue.slice(start, start + inserted);
+  // File import
+  importFileBtn.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      document.execCommand('insertImage', false, reader.result);
+      // triggers input → updates Yjs
+    };
+    reader.readAsDataURL(file);
+  });
 
-  // 4) Build op and emit
-  const op = { index: start, removed, inserted: insertedText };
-  socket.emit('operation', op);
-
-  // 5) Update lastValue
-  lastValue = newValue;
-});
-
-// Apply incoming operations without shifting the local cursor
-socket.on('operation', op => {
-  const { index, removed, inserted } = op;
-
-  // Prevent our own input listener from firing
-  isApplyingRemote = true;
-
-  // Apply the change in-place, preserving selection
-  editor.setRangeText(inserted, index, index + removed, 'preserve');
-  isApplyingRemote = false;
-
-  // Update our snapshot and resize
-  lastValue = editor.value;
-  autoResize();
+  // URL import
+  importUrlBtn.addEventListener('click', () => {
+    const url = prompt('Enter image URL');
+    if (url) {
+      document.execCommand('insertImage', false, url);
+    }
+  });
 });
