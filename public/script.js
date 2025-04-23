@@ -1,26 +1,28 @@
 const socket = io();
 const editor = document.getElementById('editor');
 
-// Initialize with server content (preserves newlines)
+// Auto-resize the textarea to fit content
+function autoResize() {
+  editor.style.height = 'auto';
+  editor.style.height = editor.scrollHeight + 'px';
+}
+
+// Initialize with server content
 socket.on('init', content => {
-  editor.innerText = content;
+  editor.value = content;
+  autoResize();
 });
 
-// Whenever the user types, grab the *visible* text (with line breaks)
+// On local edits, resize & emit entire document
 editor.addEventListener('input', () => {
-  const text = editor.innerText;
-  socket.emit('edit', text);
+  autoResize();
+  socket.emit('edit', editor.value);
 });
 
-// When other users’ edits come in, overwrite and restore cursor
+// On remote updates, keep cursor pos & resize
 socket.on('update', content => {
-  const sel = window.getSelection();
-  const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
-
-  editor.innerText = content;
-
-  if (range) {
-    sel.removeAllRanges();
-    sel.addRange(range);
-  }
+  const cursor = editor.selectionStart;
+  editor.value = content;
+  autoResize();
+  editor.selectionStart = editor.selectionEnd = cursor;
 });
