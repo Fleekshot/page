@@ -7,11 +7,11 @@ html, body {
 }
 #editor {
   width: 100%;
-  min-height: 100vh;        /* grows as you type past the first page */
+  min-height: 100vh;        /* grows as you type past the first “page” */
   padding: 20px;
   box-sizing: border-box;
   outline: none;
-  white-space: pre-wrap;
+  white-space: pre-wrap;     /* preserve newline characters */
   word-wrap: break-word;
   font-size: 16px;
   line-height: 1.5;
