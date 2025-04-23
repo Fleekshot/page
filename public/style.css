@@ -1,18 +1,18 @@
 html, body {
   margin: 0;
   padding: 0;
-  height: auto;
-  font-family: monospace;
   background: #f9f9f9;
 }
 #editor {
   width: 100%;
-  min-height: 100vh;        /* grows as you type past the first “page” */
+  min-height: 100vh;       /* at least one “page” tall */
   padding: 20px;
   box-sizing: border-box;
+  border: none;
   outline: none;
-  white-space: pre-wrap;     /* preserve newline characters */
-  word-wrap: break-word;
+  resize: none;
+  overflow: hidden;         /* we’ll grow the textarea instead of scrollbars */
+  font-family: monospace;
   font-size: 16px;
   line-height: 1.5;
 }
