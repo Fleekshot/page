@@ -1,27 +1,24 @@
 const socket = io();
 const editor = document.getElementById('editor');
 
-// Initialize with server content
+// Initialize with server content (preserves newlines)
 socket.on('init', content => {
-  editor.textContent = content;
+  editor.innerText = content;
 });
 
-// Broadcast edits whenever the user types
+// Whenever the user types, grab the *visible* text (with line breaks)
 editor.addEventListener('input', () => {
-  const text = editor.textContent;
+  const text = editor.innerText;
   socket.emit('edit', text);
 });
 
-// Receive updates from other users
+// When other users’ edits come in, overwrite and restore cursor
 socket.on('update', content => {
-  // Save cursor/selection
   const sel = window.getSelection();
   const range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
 
-  // Apply new content
-  editor.textContent = content;
+  editor.innerText = content;
 
-  // Restore cursor (basic)
   if (range) {
     sel.removeAllRanges();
     sel.addRange(range);
