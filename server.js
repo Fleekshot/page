@@ -1,25 +1,44 @@
-// server.js
 const express = require('express');
 const http = require('http');
-const path = require('path');
-const WebSocket = require('ws');
-// Pull setupWSConnection from the y-websocket package root
-const { setupWSConnection } = require('y-websocket');
+const { Server } = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-// Use ws.Server rather than requiring an internal utils path
-const wss = new WebSocket.Server({ server });
+const io = new Server(server);
 
-// Serve static files from /public
-app.use(express.static(path.join(__dirname, 'public')));
+// In-memory document content
+let documentContent = '';
 
-// Let y-websocket handle each WebSocket connection
-wss.on('connection', (ws, req) => {
-  setupWSConnection(ws, req);
+// Apply an operation to the document string
+function applyOp(doc, { index, removed, inserted }) {
+  return doc.slice(0, index)
+       + inserted
+       + doc.slice(index + removed);
+}
+
+// Serve static files
+app.use(express.static('public'));
+
+io.on('connection', socket => {
+  console.log('👤 user connected:', socket.id);
+
+  // Send full doc to newcomers
+  socket.emit('init', documentContent);
+
+  // Handle granular edit ops
+  socket.on('operation', op => {
+    // update server state
+    documentContent = applyOp(documentContent, op);
+    // broadcast the same op to everyone else
+    socket.broadcast.emit('operation', op);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🚪 user disconnected:', socket.id);
+  });
 });
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () =>
-  console.log(`🚀 HTTP + WS listening on port ${PORT}`)
+  console.log(`🚀 Server listening on port ${PORT}`)
 );
